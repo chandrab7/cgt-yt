@@ -1,0 +1,12 @@
+# Large media files
+*.mp4
+*.mov
+*.mp3
+*.wav
+*.png
+
+# macOS
+.DS_Store
+
+# Temp files
+*.tmp
