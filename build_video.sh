@@ -138,7 +138,19 @@ done
 ffmpeg -y -f concat -safe 0 -i "$SR2_LIST" -c copy "$TMPDIR/part_sr2.mp4" 2>/dev/null
 
 # ========================================
-# 4. Crossfade transitions between sections
+# 4. End card generation
+# ========================================
+echo "=== Generating end card ==="
+python3 generate_end_card.py
+
+END_CARD_DUR=5
+ffmpeg -y -loop 1 -i end_card.png -t "$END_CARD_DUR" \
+  -vf "scale=${W}:${H},fps=$FPS" \
+  -c:v libx264 -preset fast -crf 18 \
+  "$TMPDIR/part_endcard.mp4" 2>/dev/null
+
+# ========================================
+# 5. Crossfade transitions between sections
 # ========================================
 echo "=== Adding crossfade transitions ==="
 XFADE_DUR=2  # 2-second crossfade
@@ -161,7 +173,17 @@ HERO_SR2_DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$TMPD
 OFFSET2=$(python3 -c "print(float('$HERO_SR2_DUR') - $XFADE_DUR)")
 ffmpeg -y -i "$TMPDIR/hero_sr2.mp4" -i "$TMPDIR/part_sr1.mp4" \
   -filter_complex "
-    [0:v][1:v]xfade=transition=fade:duration=${XFADE_DUR}:offset=${OFFSET2}[vout]
+    [0:v][1:v]xfade=transition=fade:duration=${XFADE_DUR}:offset=${OFFSET2}[v_no_end]
+  " \
+  -map "[v_no_end]" -c:v libx264 -preset fast -crf 18 -an \
+  "$TMPDIR/video_no_endcard.mp4" 2>/dev/null
+
+# Crossfade SR1 -> end card
+SR1_FULL_DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$TMPDIR/video_no_endcard.mp4")
+OFFSET3=$(python3 -c "print(float('$SR1_FULL_DUR') - $XFADE_DUR)")
+ffmpeg -y -i "$TMPDIR/video_no_endcard.mp4" -i "$TMPDIR/part_endcard.mp4" \
+  -filter_complex "
+    [0:v][1:v]xfade=transition=fade:duration=${XFADE_DUR}:offset=${OFFSET3}[vout]
   " \
   -map "[vout]" -c:v libx264 -preset fast -crf 18 -an \
   "$TMPDIR/video_only.mp4" 2>/dev/null
